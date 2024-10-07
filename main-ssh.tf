@@ -1,9 +1,24 @@
+# Declare variables
+variable "google_project_id" {
+  description = "Google Cloud project ID"
+  type        = string
+}
+
+variable "google_credentials" {
+  description = "Path to the Google Cloud credentials JSON file"
+  type        = string
+}
+
+variable "ssh_user" {
+  description = "SSH user name"
+  type        = string
+}
+
 # Configure the Google Cloud provider
 provider "google" {
-  credentials = file("credentials.json")
-  project     = "student-sup-de-vinci"
+  credentials = file(var.google_credentials)
+  project     = var.google_project_id
   region      = "us-central1"
-  zone        = "us-central1-f"
 }
 
 # Generate a new SSH key pair
@@ -15,7 +30,7 @@ resource "tls_private_key" "ssh_key" {
 # Manage project metadata
 resource "google_compute_project_metadata" "my_project_metadata" {
   metadata = {
-    ssh-keys = "ci_user:${trimspace(tls_private_key.ssh_key.public_key_openssh)}"
+    ssh-keys = "${var.ssh_user}:${trimspace(tls_private_key.ssh_key.public_key_openssh)}"
   }
 }
 
@@ -23,18 +38,16 @@ resource "google_compute_project_metadata" "my_project_metadata" {
 resource "google_compute_instance" "tp_sdv_cloud" {
   count        = 3
   name         = "tpsdvcloud${count.index + 1}"
-  machine_type = "t2a-standard-1"
+  machine_type = "e2-medium"
   zone         = "us-central1-f"
 
   boot_disk {
     auto_delete = true
-    device_name = "tpsdvcloud${count.index + 1}"
     initialize_params {
-      image = "projects/debian-cloud/global/images/debian-12-bookworm-arm64-v20240910"
+      image = "debian-cloud/debian-12-bookworm"
       size  = 10
       type  = "pd-standard"
     }
-    mode = "READ_WRITE"
   }
 
   network_interface {
@@ -49,7 +62,7 @@ resource "google_compute_instance" "tp_sdv_cloud" {
 
   metadata_startup_script = <<-EOF
     #!/bin/bash
-    echo "Installing Docker.io"
+    echo "Installing Docker..."
     apt-get update
     apt-get install -y docker.io
     systemctl enable docker
@@ -83,7 +96,6 @@ resource "google_compute_firewall" "allow_ssh" {
   source_ranges = ["0.0.0.0/0"]
   target_tags   = ["allow-ssh"]
 
-  # Add a lifecycle rule to prevent recreation if it already exists
   lifecycle {
     create_before_destroy = true
   }
@@ -92,7 +104,7 @@ resource "google_compute_firewall" "allow_ssh" {
 # Output the private key for CI/CD use
 output "private_key" {
   value     = tls_private_key.ssh_key.private_key_pem
-  sensitive = false
+  sensitive = true
 }
 
 # Output to display the external IP addresses of the VMs
