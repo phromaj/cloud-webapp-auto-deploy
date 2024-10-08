@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base, VisitCounter
 from fastapi.templating import Jinja2Templates
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost:5432/mydatabase')
 
@@ -30,6 +31,17 @@ def get_db():
     finally:
         db.close()
 
+# Fonction pour se connecter à la base de données avec un mécanisme de retry
+@retry(stop=stop_after_attempt(10), wait=wait_fixed(3))
+def get_db_version():
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    cursor.execute("SELECT version();")
+    db_version = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return db_version[0]
+
 @app.get("/")
 def read_root(request: Request, db: Session = Depends(get_db)):
     # Vérifier si un compteur existe
@@ -45,13 +57,7 @@ def read_root(request: Request, db: Session = Depends(get_db)):
     # Informations sur la base de données
     db_info = "PostgreSQL"
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-        cursor.execute("SELECT version();")
-        db_version = cursor.fetchone()
-        db_info = db_version[0]
-        cursor.close()
-        conn.close()
+        db_info = get_db_version()
     except Exception as e:
         db_info = f"Erreur lors de la récupération des informations : {e}"
 
