@@ -1,0 +1,67 @@
+
+---
+- name: Initialize Docker Swarm
+  hosts: all
+  gather_facts: yes
+  become: yes
+  vars:
+    ansible_user: admin
+    ansible_ssh_private_key_file: ssh.pem
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+  tasks:
+    - name: Ensure Docker service is started
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Python Docker module via apt
+      apt:
+        name: python3-docker
+        state: present
+
+    - name: Initialize Docker Swarm
+      docker_swarm:
+        state: present
+      when: inventory_hostname == groups['managers'][0]
+      register: swarm_info
+
+    - name: Get swarm manager join token
+      command: docker swarm join-token -q manager
+      when: inventory_hostname == groups['managers'][0]
+      register: manager_token
+
+    - name: Get swarm worker join token
+      command: docker swarm join-token -q worker
+      when: inventory_hostname == groups['managers'][0]
+      register: worker_token
+
+    - name: Join additional managers to swarm
+      docker_swarm:
+        state: join
+        advertise_addr: "{{ ansible_default_ipv4.address }}"
+        join_token: "{{ hostvars[groups['managers'][0]]['manager_token']['stdout'] }}"
+        remote_addrs: [ "{{ hostvars[groups['managers'][0]]['ansible_default_ipv4']['address'] }}" ]
+      when: inventory_hostname in groups['managers'][1:]
+
+    - name: Join workers to swarm
+      docker_swarm:
+        state: join
+        advertise_addr: "{{ ansible_default_ipv4.address }}"
+        join_token: "{{ hostvars[groups['managers'][0]]['worker_token']['stdout'] }}"
+        remote_addrs: [ "{{ hostvars[groups['managers'][0]]['ansible_default_ipv4']['address'] }}" ]
+      when: inventory_hostname in groups['workers']
+
+    - name: Get swarm nodes
+      command: docker node ls
+      register: node_list
+      when: inventory_hostname == groups['managers'][0]
+
+    - name: Display swarm nodes
+      debug:
+        var: node_list.stdout_lines
+      when: inventory_hostname == groups['managers'][0]
