@@ -1,21 +1,52 @@
 
 ---
-- name: Deploy Docker Swarm Stack
+- name: Deploy Docker Swarm Stack with FastAPI
   hosts: all
   become: yes
   vars:
     ansible_user: admin
     ansible_ssh_private_key_file: ssh.pem
     ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
-
   tasks:
-    - name: Ensure Docker is installed
+    - name: Update apt cache
       apt:
-        name:
-          - docker.io
-          - python3-docker
-        state: present
         update_cache: yes
+
+    - name: Check if docker.io is installed
+      command: dpkg-query -W docker.io
+      register: docker_check
+      failed_when: docker_check.rc > 1
+      changed_when: docker_check.rc == 1
+
+    - name: Install docker.io if not present
+      apt:
+        name: docker.io
+        state: present
+      when: docker_check.rc == 1
+
+    - name: Check if python3-docker is installed
+      command: dpkg-query -W python3-docker
+      register: python_docker_check
+      failed_when: python_docker_check.rc > 1
+      changed_when: python_docker_check.rc == 1
+
+    - name: Install python3-docker if not present
+      apt:
+        name: python3-docker
+        state: present
+      when: python_docker_check.rc == 1
+
+    - name: Check if python3-jsondiff is installed
+      command: dpkg-query -W python3-jsondiff
+      register: jsondiff_check
+      failed_when: jsondiff_check.rc > 1
+      changed_when: jsondiff_check.rc == 1
+
+    - name: Install python3-jsondiff if not present
+      apt:
+        name: python3-jsondiff
+        state: present
+      when: jsondiff_check.rc == 1
 
     - name: Ensure Docker service is started and enabled
       systemd:
@@ -55,92 +86,60 @@
         remote_addrs: [ "{{ hostvars[groups['managers'][0]]['ansible_default_ipv4']['address'] }}" ]
       when: inventory_hostname in groups['workers']
 
-    - name: Create docker-compose.yml
+    - name: Create Docker Swarm stack file
       copy:
-        dest: /root/docker-compose.yml
         content: |
           version: '3.8'
           services:
             fastapi:
               image: ghcr.io/phromaj/cloud-webapp-auto-deploy:latest
+              environment:
+                - DATABASE_URL=postgresql://postgres:password@db:5432/mydatabase
+              ports:
+                - target: 8000
+                  published: 80
+                  mode: host
               deploy:
                 mode: global
-              environment:
-                - DATABASE_URL=postgresql://postgres:password@myapp_db:5432/mydatabase
-              depends_on:
-                - db
-
               networks:
-                - myapp_network
+                - app_network
             db:
               image: postgres:15-alpine
-              deploy:
-                replicas: 1
-                placement:
-                  constraints: [node.role == manager]
               environment:
                 POSTGRES_USER: postgres
                 POSTGRES_PASSWORD: password
                 POSTGRES_DB: mydatabase
               volumes:
                 - postgres_data:/var/lib/postgresql/data
-              networks:
-                - myapp_network
-            caddy:
-              image: caddy:latest
               deploy:
-                replicas: 1
                 placement:
                   constraints: [node.role == manager]
-
-              ports:
-                - target: 80
-                  published: 80
-                  protocol: tcp
-                  mode: host
-                - target: 443
-                  published: 443
-                  protocol: tcp
-                  mode: host
-              volumes:
-                - caddy_data:/data
-                - caddy_config:/config
-              configs:
-                - source: caddy_config
-                  target: /etc/caddy/Caddyfile
-              depends_on:
-                - fastapi
               networks:
-                - myapp_network
+                - app_network
           networks:
-            myapp_network:
+            app_network:
               driver: overlay
           volumes:
             postgres_data:
-            caddy_data:
-            caddy_config:
-          configs:
-            caddy_config:
-              file: ./Caddyfile
+        dest: /tmp/swarm-stack.yml
       when: inventory_hostname == groups['managers'][0]
 
-    - name: Create Caddyfile
-      copy:
-        dest: /root/Caddyfile
-        content: |
-          :80 {
-              reverse_proxy fastapi:8000
-          }
+    - name: Deploy Docker Swarm stack
+      docker_stack:
+        state: present
+        name: ma_stack
+        compose:
+          - /tmp/swarm-stack.yml
       when: inventory_hostname == groups['managers'][0]
 
-    - name: Deploy stack
-      command: docker stack deploy -c /root/docker-compose.yml myapp
+    - name: Force update of FastAPI service
+      command: docker service update --force ma_stack_fastapi
       when: inventory_hostname == groups['managers'][0]
 
-    - name: Wait for services to stabilize
-      command: docker stack services myapp
+    - name: Wait for services to be running
+      command: docker service ls --format '{{.Name}} {{.Replicas}}'
       register: service_status
-      until: "'0/3' not in service_status.stdout"
+      until: "'ma_stack_fastapi' in service_status.stdout and 'ma_stack_db' in service_status.stdout"
       retries: 30
       delay: 10
       when: inventory_hostname == groups['managers'][0]
@@ -148,19 +147,4 @@
     - name: Display service status
       debug:
         var: service_status.stdout_lines
-      when: inventory_hostname == groups['managers'][0]
-
-    - name: Check service logs
-      command: docker service logs {{ item }} --tail 50
-      loop:
-        - myapp_fastapi
-        - myapp_db
-        - myapp_caddy
-      register: service_logs
-      when: inventory_hostname == groups['managers'][0]
-
-    - name: Display service logs
-      debug:
-        var: item.stdout_lines
-      loop: "{{ service_logs.results }}"
       when: inventory_hostname == groups['managers'][0]
