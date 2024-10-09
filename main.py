@@ -9,7 +9,9 @@ from models import Base, VisitCounter
 from fastapi.templating import Jinja2Templates
 from tenacity import retry, stop_after_attempt, wait_fixed
 
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost:5432/mydatabase')
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 
 # Configuration de la base de données
 engine = create_engine(DATABASE_URL)
