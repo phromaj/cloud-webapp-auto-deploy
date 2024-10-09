@@ -3,20 +3,37 @@ import platform
 import psycopg2
 import fastapi
 from fastapi import FastAPI, Depends, Request
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base, VisitCounter
 from fastapi.templating import Jinja2Templates
 from tenacity import retry, stop_after_attempt, wait_fixed
+import time
 
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost:5432/mydatabase')
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 
 # Configuration de la base de données
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Créer les tables
-Base.metadata.create_all(bind=engine)
+# Fonction pour créer les tables avec un retry et un délai entre les tentatives
+@retry(stop=stop_after_attempt(5), wait=wait_fixed(2))
+def create_tables_with_retry(engine):
+    inspector = inspect(engine)
+    if not inspector.has_table("visit_counter"):
+        print("Creating tables...")
+        Base.metadata.create_all(bind=engine)
+        print("Tables created.")
+    else:
+        print("Tables already exist.")
+
+# Appel de la fonction pour créer les tables avec retry
+try:
+    create_tables_with_retry(engine)
+except Exception as e:
+    print(f"Failed to create tables: {e}")
 
 app = FastAPI()
 
@@ -87,3 +104,4 @@ def read_root(request: Request, db: Session = Depends(get_db)):
         "port_info": port_info,
         "container_info": container_info
     })
+
