@@ -104,4 +104,3 @@ def read_root(request: Request, db: Session = Depends(get_db)):
         "port_info": port_info,
         "container_info": container_info
     })
-
