@@ -1,21 +1,74 @@
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 4.0"
-    }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.0"
-    }
-  }
-}
-
+# Configure the Google Cloud provider
 provider "google" {
   project     = var.project_id
   region      = var.region
   credentials = file("credentials.json")
 }
+
+# Enable required APIs
+resource "google_project_service" "kubernetes_engine" {
+  service = "container.googleapis.com"
+}
+
+resource "google_project_service" "sql_admin" {
+  service = "sqladmin.googleapis.com"
+}
+
+# Create a GKE cluster
+resource "google_container_cluster" "primary" {
+  name               = "my-gke-cluster"
+  location           = var.region
+  initial_node_count = 1
+
+  node_config {
+    machine_type = "e2-medium"
+  }
+
+  depends_on = [
+    google_project_service.kubernetes_engine
+  ]
+}
+
+# Create a Cloud SQL PostgreSQL instance
+resource "google_sql_database_instance" "postgres" {
+  name             = "postgres-instance"
+  database_version = "POSTGRES_15"
+  region           = var.region
+
+  settings {
+    tier = "db-f1-micro"
+
+    ip_configuration {
+      ipv4_enabled = true
+      authorized_networks {
+        name  = "All IP addresses"
+        value = "0.0.0.0/0"
+      }
+    }
+  }
+
+  deletion_protection = false
+
+  depends_on = [
+    google_project_service.sql_admin
+  ]
+}
+
+# Create a database
+resource "google_sql_database" "database" {
+  name     = "mydatabase"
+  instance = google_sql_database_instance.postgres.name
+}
+
+# Create a user
+resource "google_sql_user" "users" {
+  name     = "postgres"
+  instance = google_sql_database_instance.postgres.name
+  password = "password"
+}
+
+# Kubernetes provider configuration
+data "google_client_config" "default" {}
 
 provider "kubernetes" {
   host                   = "https://${google_container_cluster.primary.endpoint}"
@@ -23,135 +76,10 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(google_container_cluster.primary.master_auth[0].cluster_ca_certificate)
 }
 
-data "google_client_config" "default" {}
-
-resource "google_container_cluster" "primary" {
-  name     = "my-gke-cluster"
-  location = "europe-west1"
-
-  remove_default_node_pool = true
-  initial_node_count       = 1
-
-  ip_allocation_policy {
-    cluster_ipv4_cidr_block  = "/16"
-    services_ipv4_cidr_block = "/22"
-  }
-}
-
-resource "google_container_node_pool" "primary_nodes" {
-  name       = "my-node-pool"
-  location   = "europe-west1"
-  cluster    = google_container_cluster.primary.name
-  node_count = 1  # Increased to 2 nodes for the FastAPI replicas
-
-  node_config {
-    preemptible  = true
-    machine_type = "e2-small"
-
-    # Explicitly set a smaller boot disk size
-    disk_size_gb = 10
-
-    oauth_scopes = [
-      "https://www.googleapis.com/auth/cloud-platform"
-    ]
-  }
-}
-
-# PostgreSQL StatefulSet
-resource "kubernetes_stateful_set" "postgres" {
+# Deploy custom webapp
+resource "kubernetes_deployment" "webapp" {
   metadata {
-    name = "postgres"
-  }
-
-  spec {
-    service_name = "postgres"
-    replicas     = 1
-
-    selector {
-      match_labels = {
-        app = "postgres"
-      }
-    }
-
-    template {
-      metadata {
-        labels = {
-          app = "postgres"
-        }
-      }
-
-      spec {
-        container {
-          name  = "postgres"
-          image = "postgres:15-alpine"
-
-          env {
-            name  = "POSTGRES_USER"
-            value = "postgres"
-          }
-          env {
-            name  = "POSTGRES_PASSWORD"
-            value = "password"
-          }
-          env {
-            name  = "POSTGRES_DB"
-            value = "mydatabase"
-          }
-
-          port {
-            container_port = 5432
-          }
-
-          volume_mount {
-            name       = "postgres-storage"
-            mount_path = "/var/lib/postgresql/data"
-            sub_path   = "postgres"
-          }
-        }
-      }
-    }
-
-    volume_claim_template {
-      metadata {
-        name = "postgres-storage"
-      }
-
-      spec {
-        access_modes = ["ReadWriteOnce"]
-        resources {
-          requests = {
-            storage = "5Gi"
-          }
-        }
-      }
-    }
-  }
-}
-
-# PostgreSQL Service
-resource "kubernetes_service" "postgres" {
-  metadata {
-    name = "postgres"
-  }
-
-  spec {
-    selector = {
-      app = kubernetes_stateful_set.postgres.spec[0].template[0].metadata[0].labels.app
-    }
-
-    port {
-      port        = 5432
-      target_port = 5432
-    }
-
-    cluster_ip = "None"  # Headless service for StatefulSet
-  }
-}
-
-# FastAPI Deployment
-resource "kubernetes_deployment" "fastapi" {
-  metadata {
-    name = "fastapi"
+    name = "webapp"
   }
 
   spec {
@@ -159,25 +87,25 @@ resource "kubernetes_deployment" "fastapi" {
 
     selector {
       match_labels = {
-        app = "fastapi"
+        app = "webapp"
       }
     }
 
     template {
       metadata {
         labels = {
-          app = "fastapi"
+          app = "webapp"
         }
       }
 
       spec {
         container {
           image = "ghcr.io/phromaj/cloud-webapp-auto-deploy:latest"
-          name  = "fastapi"
+          name  = "webapp"
 
           env {
             name  = "DATABASE_URL"
-            value = "postgresql://postgres:password@postgres:5432/mydatabase"
+            value = "postgresql://postgres:password@${google_sql_database_instance.postgres.public_ip_address}:5432/mydatabase"
           }
 
           port {
@@ -187,17 +115,22 @@ resource "kubernetes_deployment" "fastapi" {
       }
     }
   }
+
+  depends_on = [
+    google_container_cluster.primary,
+    google_sql_database_instance.postgres
+  ]
 }
 
-# FastAPI Service (ClusterIP)
-resource "kubernetes_service" "fastapi" {
+# Expose webapp service
+resource "kubernetes_service" "webapp" {
   metadata {
-    name = "fastapi"
+    name = "webapp"
   }
 
   spec {
     selector = {
-      app = kubernetes_deployment.fastapi.spec[0].template[0].metadata[0].labels.app
+      app = "webapp"
     }
 
     port {
@@ -209,7 +142,7 @@ resource "kubernetes_service" "fastapi" {
   }
 }
 
-# Nginx Deployment (Load Balancer)
+# Deploy Nginx as load balancer
 resource "kubernetes_deployment" "nginx" {
   metadata {
     name = "nginx"
@@ -233,7 +166,7 @@ resource "kubernetes_deployment" "nginx" {
 
       spec {
         container {
-          image = "nginx:latest"
+          image = "nginx:1.21.6"
           name  = "nginx"
 
           port {
@@ -256,9 +189,13 @@ resource "kubernetes_deployment" "nginx" {
       }
     }
   }
+
+  depends_on = [
+    kubernetes_deployment.webapp
+  ]
 }
 
-# Nginx ConfigMap
+# Nginx ConfigMap for load balancing
 resource "kubernetes_config_map" "nginx_config" {
   metadata {
     name = "nginx-config"
@@ -266,22 +203,20 @@ resource "kubernetes_config_map" "nginx_config" {
 
   data = {
     "default.conf" = <<-EOF
-      upstream fastapi {
-        server fastapi.default.svc.cluster.local:8000;
+      upstream webapp {
+        server webapp:8000;
       }
-
       server {
         listen 80;
-
         location / {
-          proxy_pass http://fastapi;
+          proxy_pass http://webapp;
         }
       }
     EOF
   }
 }
 
-# Nginx Service (LoadBalancer)
+# Expose Nginx service
 resource "kubernetes_service" "nginx" {
   metadata {
     name = "nginx"
@@ -289,7 +224,7 @@ resource "kubernetes_service" "nginx" {
 
   spec {
     selector = {
-      app = kubernetes_deployment.nginx.spec[0].template[0].metadata[0].labels.app
+      app = "nginx"
     }
 
     port {
@@ -301,21 +236,7 @@ resource "kubernetes_service" "nginx" {
   }
 }
 
-# Firewall rule for HTTP and HTTPS
-resource "google_compute_firewall" "allow_http_https" {
-  name    = "allow-http-https"
-  network = "default"
-
-  allow {
-    protocol = "tcp"
-    ports    = ["80", "443"]
-  }
-
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["gke-my-gke-cluster"]
-}
-
-output "nginx_load_balancer_ip" {
-  description = "The external IP address of the Nginx LoadBalancer service"
-  value       = kubernetes_service.nginx.status[0].load_balancer[0].ingress[0].ip
+# Output the external IP of the Nginx service
+output "nginx_external_ip" {
+  value = kubernetes_service.nginx.status[0].load_balancer[0].ingress[0].ip
 }

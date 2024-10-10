@@ -1,3 +1,5 @@
+# default values for variables
+
 variable "project_id" {
   description = "The ID of your Google Cloud project"
   type        = string

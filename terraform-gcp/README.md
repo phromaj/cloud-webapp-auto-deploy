@@ -3,19 +3,18 @@
 ## 1. Explication des fichiers
 
 ### main.tf
-Ce fichier est le cœur de la configuration Terraform. Il contient :
-- La définition des fournisseurs (Google Cloud et Kubernetes)
-- La création d'un cluster GKE
-- Le déploiement d'un StatefulSet PostgreSQL
-- Le déploiement d'une application FastAPI
-- La configuration d'un load balancer Nginx
-- La création d'une règle de pare-feu pour autoriser le trafic HTTP/HTTPS
 
-Principaux éléments :
-- Un cluster GKE avec un pool de nœuds personnalisé
-- Une base de données PostgreSQL déployée en tant que StatefulSet
-- Une application FastAPI déployée avec 2 réplicas
-- Un load balancer Nginx pour router le trafic vers l'application FastAPI
+Ce fichier est le cœur de la configuration Terraform. Il définit les ressources à créer dans Google Cloud Platform (GCP). Voici un aperçu des principales ressources :
+
+- Configuration du provider Google Cloud
+- Activation des APIs nécessaires (Kubernetes Engine et SQL Admin)
+- Création d'un cluster GKE (Google Kubernetes Engine)
+- Création d'une instance Cloud SQL PostgreSQL
+- Déploiement d'une application web personnalisée dans le cluster GKE
+- Configuration d'un load balancer Nginx
+
+Le fichier configure également les interconnexions entre ces différents services, comme la connexion de l'application web à la base de données PostgreSQL.
+
 
 ### terraform.tfvars
 Ce fichier contient les variables spécifiques au projet :
@@ -56,7 +55,7 @@ Ensuite, pour déployer cette infrastructure avec Terraform, suivez ces étapes 
    ```
    terraform destroy
    ```
-   Cette commande détruit toutes les ressources créées par Terraform. Utilisez-la avec précaution et seulement quand vous voulez vraiment tout supprimer.
+   Cette commande détruit toutes les ressources créées par Terraform. Utilisez-la avec précaution et seulement quand vous voulez vraiment tout supprimer. Vérifiez que `"deletion_protection"` est `true` dans votre fichier `terraform.tfstate`
 
 **Note importante** : Assurez-vous d'avoir configuré correctement vos credentials Google Cloud et d'avoir les permissions nécessaires avant d'exécuter ces commandes. Le fichier `credentials.json` mentionné dans `main.tf` doit être présent dans le répertoire de travail.
 
