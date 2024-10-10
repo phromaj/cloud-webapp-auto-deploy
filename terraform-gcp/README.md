@@ -27,52 +27,58 @@ Ce fichier définit les variables utilisées dans la configuration :
 - `region` : La région par défaut (us-central1, mais surchargée dans terraform.tfvars)
 - `gke_num_nodes` : Le nombre de nœuds dans le cluster GKE (par défaut 2)
 
-## 2. Comment lancer les commandes Terraform
+## 2. Prérequis
 
-Assurez vous d'avoir un environnement avec [Google SDK](https://cloud.google.com/sdk/docs/install-sdk) installé et configuré .
+- Avoir un environnement fonctionnel avec [Terraform](https://developer.hashicorp.com/terraform/install?product_intent=terraform) [Guide d'installation windows](https://stackoverflow.com/a/78325348)
+- Avoir un environnement avec [Google SDK](https://cloud.google.com/sdk/docs/install-sdk) installé et [configuré](https://cloud.google.com/sdk/docs/initializing).
+- Avoir cloné ce repository Github
 
-Ensuite, pour déployer cette infrastructure avec Terraform, suivez ces étapes :
+## 3. Comment lancer les commandes Terraform
 
-1. **Initialisation du projet**
+1. **Placez vous dans le répertoire `./terraform-gcp`**
+
+2. **Récupération des secrets**
+
+   Assurez-vous d'avoir configuré correctement vos credentials Google Cloud et d'avoir les permissions nécessaires avant d'exécuter ces commandes. Le fichier `credentials.json` mentionné dans `main.tf` doit être présent dans le répertoire de travail.
+
+   Pour récupérer ce fichier `credentials.json`, rendez vous sur la console de gcp > IAM & Admin > Service Accounts
+
+   ![alt text](./captures/image.png)
+
+   Cliquez sur le service account déjà créé.
+
+   ![alt text](./captures/image-1.png)
+
+   Ensuite Keys > Add Key > Create new key
+
+   ![alt text](./captures/image-2.png)
+
+   Choissisez le JSON et il va vous télécharger le `credentials.json`.
+
+   ![alt text](./captures/image-3.png)
+
+3. **Initialisation du projet**
    ```
    terraform init
    ```
    Cette commande initialise le répertoire de travail Terraform, télécharge les plugins nécessaires pour les fournisseurs Google et Kubernetes.
 
-2. **Planification des changements**
+4. **Planification des changements**
    ```
    terraform plan
    ```
    Cette commande crée un plan d'exécution, vous montrant ce que Terraform va faire sans réellement appliquer les changements.
 
-3. **Application des changements**
+5. **Application des changements**
    ```
    terraform apply
    ```
    Cette commande applique les changements nécessaires pour atteindre l'état désiré de la configuration. Terraform vous demandera de confirmer avant d'appliquer les changements.
 
-4. **Destruction de l'infrastructure (si nécessaire)**
+   Après un `terraform apply` réussi, vous pourrez accéder à votre application via l'IP du load balancer Nginx, qui sera affichée dans la sortie Terraform.
+
+6. **Destruction de l'infrastructure (si nécessaire)**
    ```
    terraform destroy
    ```
    Cette commande détruit toutes les ressources créées par Terraform. Utilisez-la avec précaution et seulement quand vous voulez vraiment tout supprimer. Vérifiez que `"deletion_protection"` est `false` dans votre fichier `terraform.tfstate`
-
-**Note importante** : Assurez-vous d'avoir configuré correctement vos credentials Google Cloud et d'avoir les permissions nécessaires avant d'exécuter ces commandes. Le fichier `credentials.json` mentionné dans `main.tf` doit être présent dans le répertoire de travail.
-
-Pour récupérer ce fichier `credentials.json`, rendez vous sur la console de gcp > IAM & Admin > Service Accounts
-
-![alt text](./captures/image.png)
-
-Cliquez sur le service account déjà créé.
-
-![alt text](./captures/image-1.png)
-
-Ensuite Keys > Add Key > Create new key
-
-![alt text](./captures/image-2.png)
-
-Choissisez le JSON et il va vous télécharger le `credentials.json`.
-
-![alt text](./captures/image-3.png)
-
-Après un `terraform apply` réussi, vous pourrez accéder à votre application via l'IP du load balancer Nginx, qui sera affichée dans la sortie Terraform.
