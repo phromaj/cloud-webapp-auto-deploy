@@ -39,3 +39,124 @@ Thumbs.db
 # Project specific
 codebase.md
 .aider*
+
+# Ignore Terraform state files
+*.tfstate
+*.tfstate.*
+
+# Ignore crash log files
+crash.log
+
+# Ignore the .terraform directory
+.terraform/
+
+# Ignore the .terraform.lock.hcl file
+.terraform.lock.hcl
+
+# Ignore the .terraform.tfvars file
+*.tfvars
+
+# Ignore override files as they are usually used to override resources locally and should not be committed
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore the .terraform-version file
+.terraform-version
+
+# Ignore the .terraformrc file
+.terraformrc
+
+# Ignore Ansible inventory files
+inventory/
+
+# Ignore Ansible vault files
+*.vault
+
+# Ignore Ansible configuration files
+ansible.cfg
+
+# Ignore Ansible logs
+*.log
+
+# Ignore Ansible temporary files
+*.retry
+
+# Ignore Ansible playbook output files
+*.output
+
+# Ignore Ansible roles directory
+roles/
+
+# Ignore Ansible collections directory
+collections/
+
+# Ignore Ansible vault password files
+vault_password
+
+# Ignore local configuration files
+*.local
+*.local.yml
+*.local.json
+
+# Ignore sensitive data files
+*.secret
+*.secrets
+
+# Ignore temporary files
+*.tmp
+*.temp
+
+# Ignore backup files
+*.bak
+*.backup
+
+# Ignore cache files
+*.cache
+
+# Ignore lock files
+*.lock
+
+# Ignore test output files
+*.test
+*.test.out
+
+# Ignore coverage reports
+.coverage
+coverage/
+
+# Ignore Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore PyCharm project files
+.idea/
+
+# Ignore VSCode settings
+.vscode/
+
+# Ignore npm related files
+node_modules/
+package-lock.json
+yarn.lock
+
+# Ignore Maven related files
+target/
+pom.xml.versionsBackup
+
+# Ignore Gradle related files
+.gradle/
+build/
+
+# Ignore IntelliJ IDEA project files
+*.iml
+*.ipr
+*.iws
+
+# Ignore Eclipse project files
+.project
+.classpath
+.settings/
+
+# Ignore NetBeans project files
+nbproject/
