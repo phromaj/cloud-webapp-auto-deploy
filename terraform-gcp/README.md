@@ -55,7 +55,7 @@ Ensuite, pour déployer cette infrastructure avec Terraform, suivez ces étapes 
    ```
    terraform destroy
    ```
-   Cette commande détruit toutes les ressources créées par Terraform. Utilisez-la avec précaution et seulement quand vous voulez vraiment tout supprimer. Vérifiez que `"deletion_protection"` est `true` dans votre fichier `terraform.tfstate`
+   Cette commande détruit toutes les ressources créées par Terraform. Utilisez-la avec précaution et seulement quand vous voulez vraiment tout supprimer. Vérifiez que `"deletion_protection"` est `false` dans votre fichier `terraform.tfstate`
 
 **Note importante** : Assurez-vous d'avoir configuré correctement vos credentials Google Cloud et d'avoir les permissions nécessaires avant d'exécuter ces commandes. Le fichier `credentials.json` mentionné dans `main.tf` doit être présent dans le répertoire de travail.
 
