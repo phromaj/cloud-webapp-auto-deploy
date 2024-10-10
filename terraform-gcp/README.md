@@ -57,19 +57,21 @@ Ce fichier définit les variables utilisées dans la configuration :
 
    ![alt text](./captures/image-3.png)
 
-3. **Initialisation du projet**
+   Ensuite changez votre `"project_id"` et `"region"` dans le fichier `terraform.tfvars`
+   
+4. **Initialisation du projet**
    ```
    terraform init
    ```
    Cette commande initialise le répertoire de travail Terraform, télécharge les plugins nécessaires pour les fournisseurs Google et Kubernetes.
 
-4. **Planification des changements**
+5. **Planification des changements**
    ```
    terraform plan
    ```
    Cette commande crée un plan d'exécution, vous montrant ce que Terraform va faire sans réellement appliquer les changements.
 
-5. **Application des changements**
+6. **Application des changements**
    ```
    terraform apply
    ```
@@ -77,7 +79,7 @@ Ce fichier définit les variables utilisées dans la configuration :
 
    Après un `terraform apply` réussi, vous pourrez accéder à votre application via l'IP du load balancer Nginx, qui sera affichée dans la sortie Terraform.
 
-6. **Destruction de l'infrastructure (si nécessaire)**
+7. **Destruction de l'infrastructure (si nécessaire)**
    ```
    terraform destroy
    ```
