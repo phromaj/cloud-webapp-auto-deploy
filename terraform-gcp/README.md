@@ -29,7 +29,7 @@ Ce fichier définit les variables utilisées dans la configuration :
 
 ## 2. Prérequis
 
-- Avoir un environnement fonctionnel avec [Terraform](https://developer.hashicorp.com/terraform/install?product_intent=terraform) [Guide d'installation windows](https://stackoverflow.com/a/78325348)
+- Avoir un environnement fonctionnel avec [Terraform](https://developer.hashicorp.com/terraform/install?product_intent=terraform) ([Guide d'installation windows](https://stackoverflow.com/a/78325348)).
 - Avoir un environnement avec [Google SDK](https://cloud.google.com/sdk/docs/install-sdk) installé et [configuré](https://cloud.google.com/sdk/docs/initializing).
 - Avoir cloné ce repository Github
 
