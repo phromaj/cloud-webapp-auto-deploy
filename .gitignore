@@ -160,3 +160,5 @@ build/
 
 # Ignore NetBeans project files
 nbproject/
+
+debug_info/
