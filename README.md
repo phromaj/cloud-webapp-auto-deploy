@@ -1,7 +1,5 @@
 # Documentation du Projet "cloud-webapp-auto-deploy"
 
-Ce document fournit des instructions détaillées sur la façon de lancer le projet en local, ainsi qu'une explication des pipelines CI/CD et de leur fonctionnement.
-
 ## Table des matières
 
 1. [Introduction](#introduction)
@@ -14,9 +12,11 @@ Ce document fournit des instructions détaillées sur la façon de lancer le pro
 4. [Explication des pipelines CI/CD](#explication-des-pipelines-cicd)
    - [Pipeline de construction et de publication de l'image Docker](#pipeline-de-construction-et-de-publication-de-limage-docker)
    - [Pipeline de déploiement Terraform sur GCP](#pipeline-de-déploiement-terraform-sur-gcp)
-5. [Annexes](#annexes)
+5. [Provisionnement de clusters Kubernetes](#provisionnement-de-clusters-kubernetes)
+   - [Azure Kubernetes Service (AKS)](#azure-kubernetes-service-aks)
+   - [Google Kubernetes Engine (GKE)](#google-kubernetes-engine-gke)
+6. [Annexes](#annexes)
    - [Structure du projet](#structure-du-projet)
-   - [Contenu des fichiers clés](#contenu-des-fichiers-clés)
 
 ---
 
@@ -34,7 +34,7 @@ Avant de commencer, assurez-vous d'avoir les éléments suivants installés sur 
 - **Docker** : pour construire et exécuter les conteneurs Docker.
 - **Docker Compose** : pour orchestrer les conteneurs.
 - **Python 3.12** (facultatif) : si vous souhaitez exécuter l'application sans Docker.
-- **Terraform** (facultatif) : pour déployer l'infrastructure sur GCP si nécessaire.
+- **Terraform** (facultatif) : pour déployer l'infrastructure sur GCP ou Azure si nécessaire.
 
 ## Lancement du projet en local
 
@@ -220,6 +220,97 @@ Ce workflow est déclenché lors d'un push ou d'une pull request sur la branche 
 
 - **Conditions d'exécution :** La commande `terraform apply` n'est exécutée que lors d'un push sur la branche `main`, pas lors des pull requests.
 
+## Provisionnement de clusters Kubernetes
+
+Le projet inclut des configurations Terraform pour provisionner des clusters Kubernetes dans Azure et GCP.
+
+### Azure Kubernetes Service (AKS)
+
+Le dossier `terraform-az` contient la configuration pour déployer un cluster AKS sur Azure.
+
+Fichier principal : `azure_deployment.tf`
+
+Ce fichier Terraform définit les ressources suivantes :
+- Un groupe de ressources Azure
+- Un cluster AKS
+- Un serveur Azure Database pour PostgreSQL
+- Une base de données PostgreSQL
+- Des règles de pare-feu pour la base de données
+- Un déploiement Kubernetes pour l'application web
+- Un service Kubernetes pour exposer l'application
+- Un contrôleur d'entrée Nginx
+
+Pour déployer sur Azure, suivez ces étapes :
+
+1. Assurez-vous d'avoir Azure CLI installé et configuré sur votre machine.
+
+2. Connectez-vous à votre compte Azure avec une souscription active :
+   ```bash
+   az login
+   ```
+
+3. Sélectionnez la souscription que vous souhaitez utiliser :
+   ```bash
+   az account set --subscription "Nom_ou_ID_de_votre_souscription"
+   ```
+
+4. Naviguez dans le dossier `terraform-az` :
+   ```bash
+   cd terraform-az
+   ```
+
+5. Créez un fichier `terraform.tfvars` et ajoutez la variable `postgres_password` :
+   ```hcl
+   postgres_password = "votre_mot_de_passe_securise"
+   ```
+
+6. Initialisez Terraform :
+   ```bash
+   terraform init
+   ```
+
+7. Planifiez le déploiement :
+   ```bash
+   terraform plan
+   ```
+
+8. Appliquez la configuration :
+   ```bash
+   terraform apply
+   ```
+
+### Google Kubernetes Engine (GKE)
+
+Le dossier `terraform-gcp` contient la configuration pour déployer un cluster GKE sur Google Cloud Platform.
+
+Fichiers principaux :
+- `main.tf` : Configuration principale
+- `variables.tf` : Définition des variables
+- `terraform.tfvars` : Valeurs des variables (à remplir)
+
+Ces fichiers Terraform définissent les ressources suivantes :
+- Un cluster GKE
+- Une instance Cloud SQL PostgreSQL
+- Une base de données PostgreSQL
+- Un déploiement Kubernetes pour l'application web
+- Un service Kubernetes pour exposer l'application
+- Un déploiement Nginx comme équilibreur de charge
+- Des déploiements pour Prometheus et Grafana pour la surveillance
+
+Pour plus de détails sur le déploiement GKE, veuillez consulter le fichier `README.md` dans le dossier `terraform-gcp`.
+
+Pour déployer sur GCP, naviguez dans le dossier `terraform-gcp` et suivez les instructions du README :
+
+```bash
+cd terraform-gcp
+cat README.md
+```
+
+**Note** : Assurez-vous d'avoir configuré les credentials appropriés pour Azure et GCP avant d'exécuter Terraform. 
+
+- Pour Azure, vous devez être connecté via Azure CLI avec une souscription active, comme indiqué dans les étapes ci-dessus. 
+- Pour GCP, vous devrez configurer une clé de compte de service et définir la variable d'environnement `GOOGLE_APPLICATION_CREDENTIALS`.
+
 ## Annexes
 
 ### Structure du projet
@@ -234,16 +325,30 @@ La structure du projet est la suivante :
 │       └── gcp-tf-deploy.yml
 ├── Caddyfile
 ├── Dockerfile
+├── LICENSE
+├── README.md
+├── codebase.md
+├── collect_debug_info.sh
 ├── docker-compose.yml
 ├── main.py
 ├── models.py
 ├── requirements.txt
 ├── templates/
 │   └── index.html
+├── terraform-az/
+│   └── azure_deployment.tf
 ├── terraform-gcp/
+│   ├── README.md
+│   ├── captures/
+│   │   ├── image-1.png
+│   │   ├── image-2.png
+│   │   ├── image-3.png
+│   │   └── image.png
 │   ├── main.tf
-│   ├── variables.tf
-│   └── terraform.tfvars
-└── ...
+│   ├── terraform.tfvars
+│   └── variables.tf
+├── terraform.tfstate
+├── terraform.tfstate.backup
+└── terraform.tfvars
 ```
 
